@@ -240,3 +240,7 @@ my-farm-advisor-skills/
 | Change catalog structure | Root [`AGENTS.md`](AGENTS.md) and `scripts/validate.sh` | `bash -n scripts/validate.sh && ./scripts/validate.sh` |
 
 Keep edits focused, keep generated outputs out of Git, and route through the nearest `INDEX.md` before opening detailed workflow docs.
+
+## Assignment 2 EDA Subskill
+
+A reusable field-level EDA workflow was added under `my-farm-advisor/eda/assignment-2/`. It generates static visualizations comparing field boundaries, weather (growing season Apr–Sep), and CDL crop data across Illinois, Iowa, and Nebraska growers. Outputs include statistical plots, a PCA climate comparison, and a geospatial map. The generated report and figures are saved under `~/my-farm-advisor-runtime` or the configured `DATA_PIPELINE_DATA_ROOT`.
