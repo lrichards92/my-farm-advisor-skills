@@ -1,111 +1,116 @@
 #!/usr/bin/env python3
 """
 Assignment 2: Field Boundaries EDA
-Generates 2 statistical visualizations + 1 comparison for field boundary category.
+2 statistical visualizations + 1 comparison
 """
 
 from pathlib import Path
 import geopandas as gpd
 import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
 import pandas as pd
 
-# Output directory
 OUTPUT_DIR = Path(__file__).parents[1] / "outputs"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# Data paths
 GROWERS = {
     "Illinois": Path("/home/coder/my-farm-advisor-runtime/data-pipeline/growers/il-grower/farms/il-grower-illinois/boundary/field_boundaries.geojson"),
     "Iowa": Path("/home/coder/my-farm-advisor-runtime/data-pipeline/growers/iowa-grower/farms/iowa-grower-iowa/boundary/field_boundaries.geojson"),
     "Nebraska": Path("/home/coder/my-farm-advisor-runtime/data-pipeline/growers/ne-grower/farms/ne-grower-nebraska/boundary/field_boundaries.geojson"),
 }
 
-def load_all_fields():
+COLORS = {"Illinois": "#2E86AB", "Iowa": "#A23B72", "Nebraska": "#F18F01"}
+
+def load_data():
     records = []
     for grower, path in GROWERS.items():
         gdf = gpd.read_file(path)
         gdf["grower"] = grower
-        # Calculate shape complexity (perimeter / sqrt(area))
-        gdf_proj = gdf.to_crs("EPSG:5070")
-        gdf["perimeter_m"] = gdf_proj.geometry.length
-        gdf["area_m2"] = gdf_proj.geometry.area
-        gdf["shape_complexity"] = gdf["perimeter_m"] / np.sqrt(gdf["area_m2"])
-        records.append(gdf)
+        records.append(gdf[["field_id", "area_acres", "grower"]])
     return pd.concat(records, ignore_index=True)
 
-def plot_acreage_distribution(df):
-    """Viz 1: Overlapping histograms of field acreage by grower."""
+def viz1_acreage_histogram(df):
+    """Statistical viz 1: Field acreage distribution by grower."""
     fig, ax = plt.subplots(figsize=(10, 6))
-    colors = {"Illinois": "#2E86AB", "Iowa": "#A23B72", "Nebraska": "#F18F01"}
     for grower in ["Illinois", "Iowa", "Nebraska"]:
         subset = df[df["grower"] == grower]
-        ax.hist(subset["area_acres"], bins=8, alpha=0.6, label=grower, color=colors[grower], edgecolor="black")
+        ax.hist(subset["area_acres"], bins=8, alpha=0.6, label=grower, 
+                color=COLORS[grower], edgecolor="black")
     ax.set_xlabel("Field Area (acres)", fontsize=12)
     ax.set_ylabel("Count", fontsize=12)
     ax.set_title("Field Acreage Distribution by Grower", fontsize=14, fontweight="bold")
     ax.legend()
     ax.grid(axis="y", alpha=0.3)
     plt.tight_layout()
-    out = OUTPUT_DIR / "01_acreage_distribution.png"
+    out = OUTPUT_DIR / "01_acreage_histogram.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"Saved: {out}")
     plt.close(fig)
 
-def plot_shape_complexity(df):
-    """Viz 2: Boxplot of shape complexity by grower."""
+def viz2_acreage_boxplot(df):
+    """Statistical viz 2: Field acreage boxplot by grower."""
     fig, ax = plt.subplots(figsize=(8, 6))
-    colors = {"Illinois": "#2E86AB", "Iowa": "#A23B72", "Nebraska": "#F18F01"}
-    sns.boxplot(data=df, x="grower", y="shape_complexity", palette=colors, ax=ax)
-    ax.set_xlabel("Grower", fontsize=12)
-    ax.set_ylabel("Shape Complexity (perimeter / sqrt(area))", fontsize=12)
-    ax.set_title("Field Shape Complexity by Grower", fontsize=14, fontweight="bold")
+    data = [df[df["grower"] == g]["area_acres"] for g in ["Illinois", "Iowa", "Nebraska"]]
+    bp = ax.boxplot(data, patch_artist=True)
+    ax.set_xticklabels(["Illinois", "Iowa", "Nebraska"])
+    for patch, grower in zip(bp["boxes"], ["Illinois", "Iowa", "Nebraska"]):
+        patch.set_facecolor(COLORS[grower])
+        patch.set_alpha(0.7)
+    ax.set_ylabel("Field Area (acres)", fontsize=12)
+    ax.set_title("Field Acreage Distribution by Grower", fontsize=14, fontweight="bold")
     ax.grid(axis="y", alpha=0.3)
     plt.tight_layout()
-    out = OUTPUT_DIR / "02_shape_complexity.png"
+    out = OUTPUT_DIR / "02_acreage_boxplot.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"Saved: {out}")
     plt.close(fig)
 
-def plot_size_vs_regularity(df):
-    """Comparison: Field size vs. shape regularity scatter."""
-    fig, ax = plt.subplots(figsize=(10, 7))
-    colors = {"Illinois": "#2E86AB", "Iowa": "#A23B72", "Nebraska": "#F18F01"}
-    for grower in ["Illinois", "Iowa", "Nebraska"]:
-        subset = df[df["grower"] == grower]
-        ax.scatter(subset["area_acres"], subset["shape_complexity"], 
-                   label=grower, color=colors[grower], s=100, alpha=0.7, edgecolors="black")
-    ax.set_xlabel("Field Area (acres)", fontsize=12)
-    ax.set_ylabel("Shape Complexity (perimeter / sqrt(area))", fontsize=12)
-    ax.set_title("Field Size vs. Shape Regularity", fontsize=14, fontweight="bold")
+def comparison_size_by_grower(df):
+    """Comparison: Mean/median field size comparison across growers."""
+    summary = df.groupby("grower")["area_acres"].agg(["mean", "median", "std"]).round(1).reset_index()
+    
+    fig, ax = plt.subplots(figsize=(8, 6))
+    x = range(len(summary))
+    width = 0.35
+    bars1 = ax.bar([i - width/2 for i in x], summary["mean"], width, label="Mean", 
+                   color=[COLORS[g] for g in summary["grower"]], alpha=0.8, edgecolor="black")
+    bars2 = ax.bar([i + width/2 for i in x], summary["median"], width, label="Median", 
+                   color=[COLORS[g] for g in summary["grower"]], alpha=0.5, edgecolor="black")
+    ax.set_xticks(x)
+    ax.set_xticklabels(summary["grower"])
+    ax.set_ylabel("Field Area (acres)", fontsize=12)
+    ax.set_title("Mean vs. Median Field Size by Grower", fontsize=14, fontweight="bold")
     ax.legend()
-    ax.grid(alpha=0.3)
+    ax.grid(axis="y", alpha=0.3)
+    
+    # Add value labels
+    for bar in bars1:
+        height = bar.get_height()
+        ax.annotate(f'{height:.1f}', xy=(bar.get_x() + bar.get_width()/2, height),
+                   xytext=(0, 3), textcoords="offset points", ha="center", fontsize=9)
+    for bar in bars2:
+        height = bar.get_height()
+        ax.annotate(f'{height:.1f}', xy=(bar.get_x() + bar.get_width()/2, height),
+                   xytext=(0, 3), textcoords="offset points", ha="center", fontsize=9)
+    
     plt.tight_layout()
-    out = OUTPUT_DIR / "03_size_vs_regularity.png"
+    out = OUTPUT_DIR / "03_size_comparison.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"Saved: {out}")
     plt.close(fig)
     
-    # Also save a summary table
-    summary = df.groupby("grower").agg({
-        "area_acres": ["count", "mean", "std", "min", "max"],
-        "shape_complexity": ["mean", "std"]
-    }).round(2)
-    summary_path = OUTPUT_DIR / "boundary_summary.csv"
-    summary.to_csv(summary_path)
-    print(f"Saved: {summary_path}")
+    summary.to_csv(OUTPUT_DIR / "field_size_summary.csv", index=False)
+    print(f"Saved: {OUTPUT_DIR / 'field_size_summary.csv'}")
 
 def main():
     print("=" * 60)
     print("Field Boundaries EDA")
     print("=" * 60)
-    df = load_all_fields()
-    print(f"Loaded {len(df)} fields from 3 growers")
-    plot_acreage_distribution(df)
-    plot_shape_complexity(df)
-    plot_size_vs_regularity(df)
-    print("\nField boundaries analysis complete!")
+    df = load_data()
+    print(f"Loaded {len(df)} fields")
+    viz1_acreage_histogram(df)
+    viz2_acreage_boxplot(df)
+    comparison_size_by_grower(df)
+    print("Done!")
 
 if __name__ == "__main__":
     main()

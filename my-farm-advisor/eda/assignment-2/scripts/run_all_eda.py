@@ -14,8 +14,8 @@ OUTPUTS_DIR.mkdir(exist_ok=True)
 
 scripts = [
     "01_field_boundaries.py",
-    "02_weather_analysis.py",
-    "03_cdl_analysis.py",
+    "02_weather.py",
+    "03_cdl.py",
     "04_geospatial_map.py",
 ]
 
